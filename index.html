@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sleek Memorization Dashboard</title>
-    <!-- Link to the PWA configuration -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3b82f6">
     
@@ -176,13 +175,14 @@
             padding: 14px;
             border: 1px solid var(--border);
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 1.15rem;
             font-family: inherit;
             resize: vertical;
             box-sizing: border-box;
             background-color: var(--bg);
             color: var(--text);
             transition: var(--transition);
+            line-height: 1.6;
         }
         textarea:focus {
             outline: none;
@@ -246,33 +246,37 @@
             flex-grow: 1;
             padding: 16px;
             border-radius: 8px;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             white-space: pre-wrap;
             word-break: break-word;
-            line-height: 1.8;
+            line-height: 2;
             background-color: var(--bg);
             border: 1px solid var(--border);
             min-height: 320px;
         }
 
+        /* Multilingual Blank Adjustments */
         .word-blank {
             background-color: var(--blank-bg);
             color: transparent !important;
             border-radius: 4px;
             display: inline-block;
             user-select: none;
-            margin: 0 1px;
+            margin: 0 2px;
             vertical-align: middle;
-            line-height: 1.2;
+            line-height: 1.1;
         }
         
         .word-first-letter {
             border-bottom: 2px dashed var(--blank-bg);
             padding-bottom: 1px;
+            display: inline-block;
         }
         .letter-hidden {
-            opacity: 0.15;
-            letter-spacing: 1px;
+            opacity: 0; /* Complete opacity drop handles RTL connected scripts better */
+            width: 0;
+            display: inline-block;
+            visibility: hidden;
         }
     </style>
 </head>
@@ -297,7 +301,8 @@
                 </div>
             </div>
             <div class="textarea-wrapper">
-                <textarea id="textInput" placeholder="Paste your text here..."></textarea>
+                <!-- Added dir="auto" to organically shift layout directions -->
+                <textarea id="textInput" dir="auto" placeholder="أدخل النص هنا أو انسخه..."></textarea>
             </div>
             <div class="meta-info">
                 <span id="wordCount">0 words</span>
@@ -318,7 +323,8 @@
                 <button class="btn" data-mode="hide100">Hide All</button>
                 <button class="btn peek-btn" id="peekBtn">Hold to Peek</button>
             </div>
-            <div id="displayArea" class="display-area"></div>
+            <!-- Added dir="auto" to match alignment dynamically -->
+            <div id="displayArea" class="display-area" dir="auto"></div>
         </div>
     </div>
 </div>
@@ -340,21 +346,22 @@
     let savedSlots = {};
     let activeSlotName = "";
 
-    const fallbackText = `To be, or not to be, that is the question:\nWhether 'tis nobler in the mind to suffer\nThe slings and arrows of outrageous fortune,\nOr to take arms against a sea of troubles,\nAnd by opposing end them.`;
+    const fallbackText = `إنَّ مَعَ العُسْرِ يُسْرًا.\n\nTo be, or not to be, that is the question.`;
 
     function escapeHtml(text) {
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
     function renderProcessedText(text, mode) {
-        if (!text.trim()) return `<span style="color: var(--text-secondary); font-style: italic;">Canvas empty. Type or paste text on the left to begin practicing!</span>`;
+        if (!text.trim()) return `<span style="color: var(--text-secondary); font-style: italic;">Canvas empty.</span>`;
         if (mode === 'full') return escapeHtml(text);
 
-        const tokens = text.split(/([a-zA-Z\u00C0-\u017F]+)/);
+        // FIX: Using \p{L} matches ANY letter in ANY alphabet globally (Arabic, English, etc.)
+        const tokens = text.split(/(\p{L}+)/u);
         
         if (mode === 'first') {
             return tokens.map((token, i) => {
-                if (i % 2 === 1) {
+                if (i % 2 === 1) { // It's a valid word token
                     return `<span class="word-first-letter">${escapeHtml(token[0])}<span class="letter-hidden">${'_'.repeat(token.length - 1)}</span></span>`;
                 }
                 return escapeHtml(token);
@@ -379,7 +386,8 @@
 
             return tokens.map((token, i) => {
                 if (i % 2 === 1 && (indicesToHide.has(i) || percent === 1.0)) {
-                    return `<span class="word-blank" style="width: ${token.length * 0.9}ch;">${'_'.repeat(token.length)}</span>`;
+                    // Handles block-width estimation gracefully across varied character structures
+                    return `<span class="word-blank" style="width: ${token.length * 1.1}ch;">&nbsp;</span>`;
                 }
                 return escapeHtml(token);
             }).join('');
@@ -397,7 +405,7 @@
     function loadSlotsFromStorage() {
         const stored = localStorage.getItem('memo_multi_slots');
         const active = localStorage.getItem('memo_active_slot_name');
-        if (stored) { savedSlots = JSON.parse(stored); } else { savedSlots = { "Hamlet Soliloquy": fallbackText }; }
+        if (stored) { savedSlots = JSON.parse(stored); } else { savedSlots = { "الرئيسية / Default": fallbackText }; }
         if (active && savedSlots[active] !== undefined) { activeSlotName = active; } else { activeSlotName = Object.keys(savedSlots)[0] || ""; }
         renderSlotDropdown();
         textInput.value = savedSlots[activeSlotName] || "";
@@ -492,7 +500,6 @@
         setTheme(currentTheme === 'light' ? 'dark' : 'light');
     });
 
-    // --- SERVICE WORKER REGISTRATION PIPELINE ---
     window.addEventListener('DOMContentLoaded', () => {
         loadSlotsFromStorage();
         const savedTheme = localStorage.getItem('memo_theme');
